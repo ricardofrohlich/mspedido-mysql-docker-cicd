@@ -1,0 +1,538 @@
+{
+  "info": {
+    "_postman_id": "98cf9fa8-2959-424b-afda-cf6d75111cf3",
+    "name": "Microsservicos Pedidos - Demo RabbitMQ",
+    "description": "Coleção para demonstrar em aula a comunicação assíncrona via RabbitMQ entre mspedido-api (porta 8081) e produto-api (porta 8080).\n\nIMPORTANTE antes de rodar:\n1) Suba o RabbitMQ, o MySQL e o Eureka Server (se estiver usando).\n2) Suba primeiro o produto-api e depois o mspedido-api.\n3) Rode as pastas NA ORDEM: 1) Produto API - Setup, 2) Fluxo RabbitMQ - Sucesso, 3) Fluxo RabbitMQ - Estoque Insuficiente.\n4) Entre 'Criar Item do Pedido' e 'Consultar Pedido (ver status)' espere 1-2 segundos (tempo do RabbitMQ entregar e processar as mensagens de ida e volta) antes de disparar a consulta - ou rode a coleção pelo Collection Runner com um delay de 1500ms entre requisições.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "produtoUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "pedidoUrl",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "categoriaId",
+      "value": ""
+    },
+    {
+      "key": "produtoId",
+      "value": ""
+    },
+    {
+      "key": "produtoId2",
+      "value": ""
+    },
+    {
+      "key": "pedidoId",
+      "value": ""
+    },
+    {
+      "key": "pedidoId2",
+      "value": ""
+    },
+    {
+      "key": "itemId",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1) Produto API - Setup",
+      "item": [
+        {
+          "name": "Criar Categoria",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{produtoUrl}}/categorias",
+              "host": [
+                "{{produtoUrl}}"
+              ],
+              "path": [
+                "categorias"
+              ]
+            },
+            "description": "Cria uma categoria para associar ao produto de teste.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Informática\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "const json = pm.response.json();",
+                  "pm.test('Categoria tem id', () => pm.expect(json.id).to.exist);",
+                  "pm.collectionVariables.set('categoriaId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar Produto (estoque = 10)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{produtoUrl}}/produtos",
+              "host": [
+                "{{produtoUrl}}"
+              ],
+              "path": [
+                "produtos"
+              ]
+            },
+            "description": "Produto principal usado no cenário de SUCESSO (estoque suficiente).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Teclado Mecânico\",\n  \"preco\": 250.0,\n  \"estoque\": 10,\n  \"categorias\": [\n    {\n      \"id\": \"{{categoriaId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "const json = pm.response.json();",
+                  "pm.test('Produto tem id e estoque 10', () => { pm.expect(json.id).to.exist; pm.expect(json.estoque).to.eql(10); });",
+                  "pm.collectionVariables.set('produtoId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar 2º Produto (estoque = 2, para o cenário de recusa)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{produtoUrl}}/produtos",
+              "host": [
+                "{{produtoUrl}}"
+              ],
+              "path": [
+                "produtos"
+              ]
+            },
+            "description": "Produto com pouco estoque, usado no cenário em que o produto-api RECUSA a baixa (estoque insuficiente).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nome\": \"Mouse Gamer\",\n  \"preco\": 120.0,\n  \"estoque\": 2,\n  \"categorias\": [\n    {\n      \"id\": \"{{categoriaId}}\"\n    }\n  ]\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "const json = pm.response.json();",
+                  "pm.test('Produto tem id e estoque 2', () => { pm.expect(json.id).to.exist; pm.expect(json.estoque).to.eql(2); });",
+                  "pm.collectionVariables.set('produtoId2', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Listar Produtos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{produtoUrl}}/produtos",
+              "host": [
+                "{{produtoUrl}}"
+              ],
+              "path": [
+                "produtos"
+              ]
+            },
+            "description": "Conferência rápida do estoque atual de todos os produtos."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2) Fluxo RabbitMQ - Sucesso (estoque confirmado)",
+      "item": [
+        {
+          "name": "Criar Pedido (vazio)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{pedidoUrl}}/pedidos",
+              "host": [
+                "{{pedidoUrl}}"
+              ],
+              "path": [
+                "pedidos"
+              ]
+            },
+            "description": "Cria o Pedido SEM itens no corpo (o correto para este fluxo é adicionar os itens depois, pelo endpoint /itens - é isso que dispara a mensagem no RabbitMQ).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": \"2026-09-15\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "const json = pm.response.json();",
+                  "pm.test('Pedido criado com status CRIADO', () => { pm.expect(json.id).to.exist; pm.expect(json.status).to.eql('CRIADO'); });",
+                  "pm.collectionVariables.set('pedidoId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar Item do Pedido (quantidade dentro do estoque)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{pedidoUrl}}/itens",
+              "host": [
+                "{{pedidoUrl}}"
+              ],
+              "path": [
+                "itens"
+              ]
+            },
+            "description": "Este request é o gatilho: ao salvar, o mspedido-api valida o produto via REST, salva o item e publica um BaixarEstoqueCommand no RabbitMQ (routing key 'estoque.baixar'). O produto-api vai consumir essa mensagem, decrementar o estoque e responder com 'estoque.confirmado'. AGUARDE 1-2 segundos antes do próximo request.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produtoId\": \"{{produtoId}}\",\n  \"quantidade\": 2,\n  \"pedido\": {\n    \"id\": \"{{pedidoId}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "const json = pm.response.json();",
+                  "pm.test('Item criado com subtotal calculado', () => { pm.expect(json.id).to.exist; pm.expect(json.subtotal).to.be.above(0); });",
+                  "pm.collectionVariables.set('itemId', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar Pedido (ver status = PROCESSADO)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{pedidoUrl}}/pedidos",
+              "host": [
+                "{{pedidoUrl}}"
+              ],
+              "path": [
+                "pedidos"
+              ]
+            },
+            "description": "Se aparecer PROCESSADO, o ciclo completo do RabbitMQ funcionou: publicação -> consumo -> baixa de estoque -> resposta -> atualização do status. Se ainda estiver CRIADO, espere mais um instante e rode de novo (o consumo é assíncrono)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const pedidoId = pm.collectionVariables.get('pedidoId');",
+                  "const pedidos = pm.response.json();",
+                  "const pedido = pedidos.find(p => String(p.id) === String(pedidoId));",
+                  "pm.test('Pedido encontrado', () => pm.expect(pedido).to.exist);",
+                  "if (pedido) { pm.test('Status do pedido é PROCESSADO (RabbitMQ confirmou o estoque)', () => pm.expect(pedido.status).to.eql('PROCESSADO')); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Conferir estoque do produto (deve ter caído para 8)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{produtoUrl}}/produtos/{{produtoId}}",
+              "host": [
+                "{{produtoUrl}}"
+              ],
+              "path": [
+                "produtos",
+                "{{produtoId}}"
+              ]
+            },
+            "description": "Confirma que a baixa aconteceu UMA ÚNICA VEZ (antes da correção, o estoque caía duas vezes para o mesmo item, por causa da chamada REST duplicada)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Estoque foi descontado uma única vez (10 -> 8)', () => pm.expect(json.estoque).to.eql(8));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3) Fluxo RabbitMQ - Recusado (estoque insuficiente)",
+      "item": [
+        {
+          "name": "Criar Pedido (vazio)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{pedidoUrl}}/pedidos",
+              "host": [
+                "{{pedidoUrl}}"
+              ],
+              "path": [
+                "pedidos"
+              ]
+            },
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"data\": \"2026-09-15\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/201', () => pm.expect(pm.response.code).to.be.oneOf([200,201]));",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('pedidoId2', json.id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Criar Item do Pedido (quantidade MAIOR que o estoque)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{pedidoUrl}}/itens",
+              "host": [
+                "{{pedidoUrl}}"
+              ],
+              "path": [
+                "itens"
+              ]
+            },
+            "description": "produtoId2 tem só 2 unidades em estoque; pedimos 5. A checagem otimista no mspedido-api pode deixar passar (dependendo do estoque restante), mas quem decide de verdade é o produto-api ao processar a mensagem - e ele vai RECUSAR, publicando 'estoque.recusado'. AGUARDE 1-2 segundos antes do próximo request.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"produtoId\": \"{{produtoId2}}\",\n  \"quantidade\": 5,\n  \"pedido\": {\n    \"id\": \"{{pedidoId2}}\"\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200/201 (a validação otimista aqui ainda passa)', () => pm.expect(pm.response.code).to.be.oneOf([200,201]));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Consultar Pedido (ver status = CANCELADO)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{pedidoUrl}}/pedidos",
+              "host": [
+                "{{pedidoUrl}}"
+              ],
+              "path": [
+                "pedidos"
+              ]
+            },
+            "description": "Mostra o outro lado do fluxo: quando o produto-api recusa, o pedido vira CANCELADO."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const pedidoId = pm.collectionVariables.get('pedidoId2');",
+                  "const pedidos = pm.response.json();",
+                  "const pedido = pedidos.find(p => String(p.id) === String(pedidoId));",
+                  "pm.test('Pedido encontrado', () => pm.expect(pedido).to.exist);",
+                  "if (pedido) { pm.test('Status do pedido é CANCELADO (RabbitMQ recusou o estoque)', () => pm.expect(pedido.status).to.eql('CANCELADO')); }"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Conferir estoque do 2º produto (não deve ter mudado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{produtoUrl}}/produtos/{{produtoId2}}",
+              "host": [
+                "{{produtoUrl}}"
+              ],
+              "path": [
+                "produtos",
+                "{{produtoId2}}"
+              ]
+            },
+            "description": ""
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200', () => pm.response.to.have.status(200));",
+                  "const json = pm.response.json();",
+                  "pm.test('Estoque continua 2 (nada foi descontado)', () => pm.expect(json.estoque).to.eql(2));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

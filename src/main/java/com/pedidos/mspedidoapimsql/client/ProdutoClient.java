@@ -7,6 +7,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+// cliente rest síncrono pra falar com o produto-api, resolvendo o host pelo nome
+// registrado no eureka (RestClient.Builder com @LoadBalanced, ver RestClientConfig)
 @Component
 public class ProdutoClient {
     private final RestClient restClient;
@@ -19,6 +21,8 @@ public class ProdutoClient {
                 .build();
     }
 
+    // só pra validar (existe o produto? tem estoque?) antes de criar o item, não
+    // decide nada sozinho
     public ProdutoDTO buscarPorId(Long id) {
         try {
             return restClient.get()
@@ -33,6 +37,9 @@ public class ProdutoClient {
         }
     }
 
+    // ainda existe pra quem quiser baixar estoque de forma síncrona, mas não é mais
+    // chamado no fluxo normal de criar item (ver ItemPedidoService.salvar). hoje a
+    // baixa de verdade só acontece via rabbitmq, senão desconta duas vezes
     public ProdutoDTO baixarEstoque(Long id, Integer quantidade){
         try {
             return restClient.patch()

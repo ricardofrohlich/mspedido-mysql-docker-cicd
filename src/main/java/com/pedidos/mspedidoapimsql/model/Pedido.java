@@ -18,7 +18,7 @@ public class Pedido {
     private Double valor;
 
     @Enumerated(EnumType.STRING)
-    private StatusPedido status = StatusPedido.CRIADO; //quando crio sem informar o status, ele autoimaticamente deixa o status criado
+    private StatusPedido status = StatusPedido.CRIADO; //sem informar status, ja cria como CRIADO
 
     private LocalDate data;
 

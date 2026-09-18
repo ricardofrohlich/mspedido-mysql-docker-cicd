@@ -5,6 +5,8 @@ import com.pedidos.mspedidoapimsql.service.PedidoService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+// fica escutando a fila de resultado e reage quando o produto-api confirma ou recusa
+// a baixa de estoque - é aqui que fecha o ciclo assíncrono
 @Component
 public class ResultadoEstoqueListener {
 
@@ -14,6 +16,8 @@ public class ResultadoEstoqueListener {
         this.pedidoService = pedidoService;
     }
 
+    // o spring amqp chama esse método sozinho toda vez que chega mensagem na fila
+    // (numa thread separada da requisição http que criou o item)
     @RabbitListener(queues = RabbitMQConfig.QUEUE_RESULTADO_ESTOQUE)
     public void receber(ResultadoEstoque resultado) {
 

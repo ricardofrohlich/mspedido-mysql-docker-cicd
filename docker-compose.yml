@@ -1,0 +1,122 @@
+# sobe tudo de uma vez: eureka, rabbitmq, os dois bancos mysql (um pra cada serviço)
+# e os dois microsserviços (mspedido-api e produto-api).
+#
+# como rodar:
+#   1) deixa essa pasta (mspedido) do lado da pasta do produto-api, do jeito que já tá
+#      (o "build: ../msproduto..." lá embaixo depende disso pra achar o código)
+#   2) nessa pasta: docker compose up --build
+#   3) espera o banco/rabbit ficarem "healthy" no log antes das apis (o compose já
+#      cuida disso sozinho)
+#   4) testa com a coleção do postman de sempre (portas 8080/8081, as de sempre)
+#   5) pra parar tudo: docker compose down (bota -v se quiser apagar os dados também)
+#
+# por que "localhost" não funciona aqui dentro:
+# cada application.properties usa "localhost" pro banco e pro rabbitmq, que é o que
+# funciona rodando o .jar direto na máquina. só que dentro do compose cada serviço
+# roda no SEU container, e "localhost" ali dentro é o próprio container, não os
+# outros. por isso sobrescrevemos essas propriedades por variável de ambiente
+# (dá pra substituir qualquer application.properties assim) apontando pro NOME do
+# serviço no compose (tipo "mysql-pedido", "rabbitmq") em vez de "localhost".
+
+services:
+
+  eureka-server:
+    build: ./eureka-server
+    ports:
+      - "8761:8761"
+
+  mysql-pedido:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: mspedidoapidb
+    ports:
+      - "3307:3306"   # 3307 no host pra não brigar com um mysql local na 3306
+    volumes:
+      - mysql_pedido_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mysql-produto:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: produtosdb
+    ports:
+      - "3308:3306"
+    volumes:
+      - mysql_produto_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"     # amqp, usado pelas duas aplicações
+      - "15672:15672"   # painel web (guest/guest)
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  produto-api:
+    build: ../msproduto-mysql-docker-cicd
+    ports:
+      - "8080:8080"
+    environment:
+      # equivale a spring.datasource.url / username / password
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-produto:3306/produtosdb?createDatabaseIfNotExist=true&serverTimezone=America/Sao_Paulo
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      # equivale a spring.rabbitmq.host
+      SPRING_RABBITMQ_HOST: rabbitmq
+      # equivale a eureka.client.service-url.defaultZone
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      # sem isso o eureka registra o id interno do container em vez de um
+      # endereço que os outros serviços da rede do compose conseguem alcançar
+      EUREKA_INSTANCE_PREFERIPADDRESS: "true"
+    depends_on:
+      mysql-produto:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+
+  mspedido-api:
+    build: .
+    ports:
+      - "8081:8081"
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://mysql-pedido:3306/mspedidoapidb?createDatabaseIfNotExist=true&serverTimezone=America/Sao_Paulo
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_RABBITMQ_HOST: rabbitmq
+      EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka-server:8761/eureka/
+      EUREKA_INSTANCE_PREFERIPADDRESS: "true"
+      # precisa bater com o spring.application.name do produto-api, é assim que
+      # o eureka acha ele
+      PRODUTO_SERVICE_NAME: produto-api-mysql
+    depends_on:
+      mysql-pedido:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      eureka-server:
+        condition: service_started
+      produto-api:
+        condition: service_started
+
+volumes:
+  mysql_pedido_data:
+  mysql_produto_data:

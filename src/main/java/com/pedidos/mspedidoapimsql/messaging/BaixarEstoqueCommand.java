@@ -1,5 +1,9 @@
 package com.pedidos.mspedidoapimsql.messaging;
 
+// mensagem que o mspedido-api publica e o produto-api consome, pedindo pra baixar
+// "quantidade" do produto "produtoId". carrega pedidoId e itemId só pra o produto-api
+// devolver essas referências na resposta (ResultadoEstoque), já que ele não guarda
+// pedido/item, só processa e responde
 public class BaixarEstoqueCommand {
 
     private Long pedidoId;

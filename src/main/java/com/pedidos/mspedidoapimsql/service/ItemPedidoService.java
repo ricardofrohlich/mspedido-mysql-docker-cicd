@@ -26,6 +26,9 @@ public class ItemPedidoService {
     }
 
     public ItemPedido salvar(ItemPedido item){
+        // consulta síncrona só pra validar rapidinho: o produto existe e, pelo último
+        // dado do produto-api, tem estoque suficiente. é só um feedback rápido, quem
+        // decide de verdade é o produto-api quando processa a mensagem do rabbit
         ProdutoDTO produto = produtoClient.buscarPorId(item.getProdutoId());
         if(produto == null){
             throw new RuntimeException("Produto "+item.getProdutoId() + " não foi encontrado");
@@ -34,11 +37,16 @@ public class ItemPedidoService {
             throw new RuntimeException("Estoque insuficiente para o produto "+produto.getNome());
         }
         item.setSubtotal(produto.getPreco() * item.getQuantidade());
-        //aqui agora eu vou chamar o recalculaValor
 
-        produtoClient.baixarEstoque(item.getProdutoId(), item.getQuantidade());
+        // tinha uma chamada rest síncrona aqui antes de publicar no rabbit, que
+        // descontava o estoque duas vezes (uma aqui, outra quando o produto-api
+        // consumia a mensagem). removi a chamada rest, agora a baixa acontece só uma
+        // vez, via rabbit mesmo
         ItemPedido itemSalvo = repository.save(item);
-        //enviando a mensagem pro RabbitMQ solicitando a baixa do estoque
+
+        // publica no rabbit o comando pedindo a baixa. não espera resposta aqui, só vai
+        // saber se confirmou ou recusou quando o ResultadoEstoqueListener receber a
+        // mensagem de volta e atualizar o status do pedido
         estoquePublisher.publicarBaixaEstoque(
                 new BaixarEstoqueCommand(itemSalvo.getPedido().getId(),
                         itemSalvo.getId(),

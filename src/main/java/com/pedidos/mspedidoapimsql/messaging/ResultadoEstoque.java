@@ -1,5 +1,8 @@
 package com.pedidos.mspedidoapimsql.messaging;
 
+// mensagem que o produto-api publica de volta, dizendo se a baixa foi confirmada
+// (true) ou recusada (false, com o motivo). é essa mensagem que o
+// ResultadoEstoqueListener usa pra decidir se o pedido vira PROCESSADO ou CANCELADO
 public class ResultadoEstoque {
 
     private Long pedidoId;

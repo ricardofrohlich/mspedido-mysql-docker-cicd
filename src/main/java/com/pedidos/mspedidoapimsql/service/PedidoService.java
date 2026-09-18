@@ -20,9 +20,13 @@ public class PedidoService {
     }
 
     public Pedido salvar(Pedido pedido){
-
-        for(ItemPedido itemPedido : pedido.getItens()){
-            itemPedido.setPedido(pedido);
+        // quando cria o pedido sem lista de itens (o normal é criar vazio e ir
+        // adicionando pelo /itens depois), pedido.getItens() vem null - o for antigo
+        // dava NullPointerException nesse caso
+        if (pedido.getItens() != null) {
+            for (ItemPedido itemPedido : pedido.getItens()) {
+                itemPedido.setPedido(pedido);
+            }
         }
         return repository.save(pedido);
     }
@@ -34,6 +38,8 @@ public class PedidoService {
         return repository.findByStatus(status);
     }
 
+    // soma o subtotal de cada item e atualiza o valor total do pedido. isso é síncrono,
+    // diferente da baixa de estoque que agora é via rabbit
     public void recalcularValor(Long pedidoId){
         Pedido pedido = repository.findById(pedidoId)
                 .orElseThrow(() -> new RuntimeException("Pedido não encontrado: id "+pedidoId));
@@ -43,6 +49,8 @@ public class PedidoService {
         repository.save(pedido);
     }
 
+    // chamado pelo ResultadoEstoqueListener quando chega a resposta do produto-api,
+    // atualiza o status pra PROCESSADO (confirmado) ou CANCELADO (recusado)
     public void atualizarStatus(Long pedidoId, StatusPedido status){
         Pedido pedido = repository.findById(pedidoId)
                 .orElseThrow(() ->
